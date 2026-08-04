@@ -2,6 +2,10 @@
 
 Repository-local Windows desktop checker for this repository's NSE multi-timeframe TL Parquet database.
 
+![Temporary OLO DB Viewer interface reference; replace with a TL-specific capture](../docs/assets/olo-db-viewer-snapshot.png)
+
+This temporary image demonstrates the shared viewer layout. Replace it in place with a capture showing the stored TL/TL-OHLC overlays.
+
 ## Launch
 
 Double-click `olo-db-viewer.bat` here or in the repository root. The first launch creates `olo-db-viewer/.venv` and installs pinned dependencies; later launches reuse that environment.

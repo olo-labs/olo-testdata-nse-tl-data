@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this dataset or exporter, cite the repository and exact version or commit used."
+title: "NSE India Multi-Timeframe TL and Daily OHLCV Data in Parquet"
+type: dataset
+authors:
+  - name: "OLO Labs"
+repository-code: "https://github.com/olo-labs/olo-testdata-nse-tl-data"
+url: "https://github.com/olo-labs/olo-testdata-nse-tl-data"
+license: Apache-2.0
+keywords:
+  - NSE
+  - India
+  - OHLCV
+  - technical levels
+  - Parquet
+  - DuckDB

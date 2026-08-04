@@ -1,5 +1,10 @@
 # NSE India Multi-Timeframe TL Data in Parquet
 
+![Temporary OLO DB Viewer reference showing the desktop chart interface; replace with a TL-specific snapshot](docs/assets/olo-db-viewer-snapshot.png)
+
+> [!NOTE]
+> The image above is a temporary interface placeholder copied from the related OLO database project. Replace it with a TL-specific viewer capture at the same path; all documentation links will remain valid.
+
 Open, query-ready **NSE India daily OHLCV and multi-timeframe TL dataset** organized as one Parquet file per symbol. Each local file combines daily market candles with Daily, Weekly, Monthly, and Quarterly TL values in both standard and OHLC-derived forms.
 
 This repository is designed for technical-level research, chart overlays, screening, DuckDB and pandas analysis, backtesting inputs, data engineering, machine learning, and reproducible educational examples.
@@ -28,8 +33,12 @@ Common discovery terms: NSE technical levels dataset, NSE TL data, Indian stock 
 | [Quick start](docs/QUICKSTART.md) | DuckDB, Python, pandas, and Polars examples |
 | [Data quality](docs/DATA_QUALITY.md) | Validation SQL, assumptions, and limitations |
 | [FAQ](docs/FAQ.md) | Direct answers for developers, search engines, and AI tools |
+| [Discoverability guide](docs/DISCOVERABILITY.md) | Search, AI indexing, GitHub topics, and release guidance |
 | [LLM index](llms.txt) | Compact machine-readable repository map |
 | [Dataset metadata](metadata/dataset.jsonld) | Schema.org JSON-LD dataset description |
+| [Parquet schema](metadata/parquet-schema.json) | Machine-readable ordered column contract |
+| [Citation metadata](CITATION.cff) | How to cite the dataset and exporter |
+| [Contributing](CONTRIBUTING.md) | Validation, docs, exporter, and viewer contributions |
 | [Exporter configuration](scripts/config.example.json) | Citus source and local output settings |
 
 ## Repository layout
@@ -67,6 +76,9 @@ daily_open, daily_high, daily_low, daily_close, daily_volume
 ```
 
 The eight TL/OHLC columns and five daily market columns are `DOUBLE`; `candle_datetime` is `TIMESTAMP`. See the [data dictionary](docs/DATA_DICTIONARY.md) for semantics and null handling.
+
+> [!NOTE]
+> This repository does **not** contain deliverable quantity or delivery-percentage columns. Do not infer delivery statistics from `daily_volume`; delivery data belongs to a separate dataset.
 
 Physical row order is not guaranteed unless an export configuration explicitly sorts it. Consumers should use `ORDER BY candle_datetime`.
 
@@ -152,7 +164,7 @@ The exporter processes one equity at a time, streams through DuckDB's PostgreSQL
 
 ## Contributing
 
-Helpful contributions include reproducible validation reports, query recipes, documentation corrections, exporter tests, cross-platform launchers, and improvements to the local TL viewer. Do not commit credentials or private database configuration.
+Helpful contributions include reproducible validation reports, query recipes, documentation corrections, exporter tests, cross-platform launchers, and improvements to the local TL viewer. See [CONTRIBUTING.md](CONTRIBUTING.md). Do not commit credentials or private database configuration.
 
 ## License and attribution
 

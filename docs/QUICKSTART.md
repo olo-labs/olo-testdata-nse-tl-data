@@ -103,3 +103,7 @@ print(len(symbols), symbols[:20])
 ## OLO DB Viewer
 
 Double-click `olo-db-viewer.bat`. The viewer reads this repository's local `tl.parquet` files only and charts daily OHLCV together with stored TL/TL-OHLC overlays.
+
+![Temporary OLO DB Viewer interface reference; replace with a TL-specific capture](assets/olo-db-viewer-snapshot.png)
+
+The screenshot filename is stable. Overwrite `docs/assets/olo-db-viewer-snapshot.png` after capturing the TL-specific interface.

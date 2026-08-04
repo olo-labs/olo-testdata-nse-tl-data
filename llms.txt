@@ -10,9 +10,13 @@ Canonical repository: https://github.com/olo-labs/olo-testdata-nse-tl-data
 - [File structure](docs/FILE_STRUCTURE.md): `database/<group>/<symbol>/tl.parquet` contract.
 - [Data dictionary](docs/DATA_DICTIONARY.md): exact 14 columns and interpretation notes.
 - [Quick start](docs/QUICKSTART.md): DuckDB, Python, pandas, and Polars queries.
+- [Viewer snapshot](docs/assets/olo-db-viewer-snapshot.png): temporary shared UI reference; replace in place with a TL-specific capture.
 - [Data quality](docs/DATA_QUALITY.md): validation SQL and known limitations.
 - [FAQ](docs/FAQ.md): concise answers for humans and retrieval systems.
+- [Discoverability](docs/DISCOVERABILITY.md): accurate search and AI-indexing guidance.
 - [Dataset metadata](metadata/dataset.jsonld): Schema.org JSON-LD.
+- [Parquet schema](metadata/parquet-schema.json): ordered machine-readable fields and types.
+- [Citation](CITATION.cff): citation metadata.
 
 ## Critical facts
 
@@ -23,3 +27,4 @@ Canonical repository: https://github.com/olo-labs/olo-testdata-nse-tl-data
 - Physical row order is not guaranteed; always order by `candle_datetime`.
 - Symbol is encoded in the path and not repeated as a Parquet column.
 - This independent project is not affiliated with or endorsed by NSE and is not investment advice.
+- This repository has no delivery quantity or delivery-percentage columns.
