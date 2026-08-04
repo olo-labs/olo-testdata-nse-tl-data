@@ -1,0 +1,7 @@
+.venv/
+.python/
+_bootstrap/
+__pycache__/
+*.pyc
+/scripts/config.json
+/database/

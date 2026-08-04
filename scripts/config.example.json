@@ -1,0 +1,30 @@
+{
+  "database": {
+    "host_env": "CITUS_HOST",
+    "port_env": "CITUS_PORT",
+    "name_env": "CITUS_DATABASE",
+    "user_env": "CITUS_USER",
+    "password_env": "CITUS_PASSWORD",
+    "sslmode": "require"
+  },
+  "source": {
+    "schema": "public",
+    "table": "trade_log",
+    "equity_column": "symbol",
+    "columns": ["*"],
+    "where": null,
+    "incremental_column": "candle_datetime",
+    "order_by": []
+  },
+  "output": {
+    "directory": "../database",
+    "filename": "tl.parquet",
+    "compression": "zstd",
+    "row_group_size": 122880
+  },
+  "duckdb": {
+    "memory_limit": "8GB",
+    "threads": 4,
+    "temp_directory": "../database/_temp"
+  }
+}
