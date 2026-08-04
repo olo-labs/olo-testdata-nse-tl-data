@@ -70,6 +70,12 @@ symbols, overall percentage, elapsed time, estimated time remaining, incremental
 watermarks, rows written, output paths, errors, and a final summary. Database
 credentials are never included in these logs.
 
+Symbol names and output directory names are taken from the source table's
+`pk_field` column. The configured symbol universe includes a symbol only when at least one source
+row has `daily_tl > 0`. This eligibility check runs inside Citus before symbol
+names are returned. After a symbol qualifies, all its configured rows are exported,
+including rows where `daily_tl` is zero or null.
+
 No preinstalled Python is required. On the first run, the launcher downloads the
 official signed Python 3.12 installer from `python.org`, verifies its Windows
 Authenticode signature, installs a private runtime under `scripts/.python`, creates

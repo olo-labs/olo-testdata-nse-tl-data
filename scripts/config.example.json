@@ -10,9 +10,11 @@
   "source": {
     "schema": "public",
     "table": "trade_log",
-    "equity_column": "symbol",
+    "equity_column": "pk_field",
     "columns": ["*"],
     "where": null,
+    "eligibility_column": "daily_tl",
+    "eligibility_min_exclusive": 0,
     "incremental_column": "candle_datetime",
     "order_by": []
   },

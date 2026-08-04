@@ -93,6 +93,11 @@ def load_configuration(path: Path) -> dict:
         identifier(column)
     if source.get("incremental_column"):
         identifier(source["incremental_column"])
+    if source.get("eligibility_column"):
+        identifier(source["eligibility_column"])
+        minimum = source.get("eligibility_min_exclusive", 0)
+        if not isinstance(minimum, (int, float)) or isinstance(minimum, bool):
+            raise ValueError("source.eligibility_min_exclusive must be numeric")
     where = source.get("where")
     if where is not None and (not isinstance(where, str) or ";" in where):
         raise ValueError("source.where must be one SQL expression without a semicolon")
@@ -223,8 +228,20 @@ def list_equities(connection, config: dict, selected: list[str] | None, limit: i
         clauses.append(f"({where})")
     if selected:
         clauses.append(f"CAST({equity} AS VARCHAR) IN ({','.join(sql_literal(item) for item in selected)})")
-    remote_sql = (f"SELECT DISTINCT CAST({equity} AS VARCHAR) AS equity FROM {remote_table} "
-                  f"WHERE {' AND '.join(clauses)} ORDER BY equity")
+    equity_expression = f"CAST({equity} AS VARCHAR)"
+    eligibility_column = source.get("eligibility_column")
+    if eligibility_column:
+        minimum = source.get("eligibility_min_exclusive", 0)
+        remote_sql = (
+            f"SELECT {equity_expression} AS equity FROM {remote_table} "
+            f"WHERE {' AND '.join(clauses)} GROUP BY {equity_expression} "
+            f"HAVING max({identifier(eligibility_column)}) > {minimum!r} ORDER BY equity"
+        )
+    else:
+        remote_sql = (
+            f"SELECT DISTINCT {equity_expression} AS equity FROM {remote_table} "
+            f"WHERE {' AND '.join(clauses)} ORDER BY equity"
+        )
     if limit is not None:
         if limit < 1:
             raise ValueError("--limit-equities must be positive")
@@ -320,6 +337,11 @@ def main() -> int:
     log(f"Mode: {mode}")
     log(f"Source: {source['schema']}.{source['table']}")
     log(f"Equity column: {source['equity_column']}")
+    if source.get("eligibility_column"):
+        log(
+            f"Symbol eligibility: at least one row with "
+            f"{source['eligibility_column']} > {source.get('eligibility_min_exclusive', 0)}"
+        )
     log(f"Selected columns: {len(source.get('columns', ['*']))}")
     log(f"Output directory: {config['output']['directory']}")
     log(f"Output filename: {config['output']['filename']}")
