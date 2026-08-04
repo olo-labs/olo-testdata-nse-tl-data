@@ -16,6 +16,7 @@
     "eligibility_column": "daily_tl",
     "eligibility_min_exclusive": 0,
     "incremental_column": "candle_datetime",
+    "normalize_to_date": ["candle_datetime"],
     "order_by": []
   },
   "output": {

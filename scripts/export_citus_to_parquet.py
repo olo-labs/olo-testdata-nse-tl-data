@@ -93,6 +93,13 @@ def load_configuration(path: Path) -> dict:
         identifier(column)
     if source.get("incremental_column"):
         identifier(source["incremental_column"])
+    normalize_to_date = source.get("normalize_to_date", [])
+    if not isinstance(normalize_to_date, list):
+        raise ValueError("source.normalize_to_date must be an identifier list")
+    for column in normalize_to_date:
+        identifier(column)
+    if columns != ["*"] and any(column not in columns for column in normalize_to_date):
+        raise ValueError("Every source.normalize_to_date column must also appear in source.columns")
     if source.get("eligibility_column"):
         identifier(source["eligibility_column"])
         minimum = source.get("eligibility_min_exclusive", 0)
@@ -164,9 +171,23 @@ def source_sql(config: dict) -> tuple[str, str, str]:
     source = config["source"]
     table = f"citus.{identifier(source['schema'])}.{identifier(source['table'])}"
     equity = identifier(source["equity_column"])
-    columns = "*" if source.get("columns", ["*"]) == ["*"] else ", ".join(
-        identifier(column) for column in source["columns"]
-    )
+    selected = source.get("columns", ["*"])
+    normalized_columns = source.get("normalize_to_date", [])
+    normalized = set(normalized_columns)
+    if selected == ["*"]:
+        columns = "*" if not normalized else (
+            f"* EXCLUDE ({', '.join(identifier(column) for column in normalized_columns)}), "
+            + ", ".join(
+                f"CAST(CAST({identifier(column)} AS DATE) AS TIMESTAMP) AS {identifier(column)}"
+                for column in normalized_columns
+            )
+        )
+    else:
+        columns = ", ".join(
+            (f"CAST(CAST({identifier(column)} AS DATE) AS TIMESTAMP) AS {identifier(column)}"
+             if column in normalized else identifier(column))
+            for column in selected
+        )
     return table, equity, columns
 
 
@@ -265,7 +286,13 @@ def export_equity(connection, config: dict, symbol: str, destination: Path,
         if not incremental_column:
             raise ValueError("source.incremental_column is required for incremental exports")
         value = start_after.isoformat(sep=" ") if hasattr(start_after, "isoformat") else str(start_after)
-        predicate += f" AND {identifier(incremental_column)} > {sql_literal(value)}"
+        if incremental_column in config["source"].get("normalize_to_date", []):
+            predicate += (
+                f" AND CAST({identifier(incremental_column)} AS DATE) > "
+                f"CAST({sql_literal(value)} AS DATE)"
+            )
+        else:
+            predicate += f" AND {identifier(incremental_column)} > {sql_literal(value)}"
     order_sql = f" ORDER BY {', '.join(identifier(column) for column in order)}" if order else ""
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(".tmp.parquet")
