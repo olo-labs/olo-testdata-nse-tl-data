@@ -43,8 +43,27 @@ function Find-BootstrapPython {
     return $null
 }
 
-if (-not (Test-Path -LiteralPath $python)) {
-    Write-Host "[BOOTSTRAP] Python virtual environment is missing: $venv"
+$venvReady = Test-Path -LiteralPath $python -PathType Leaf
+if ($venvReady) {
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $python -c "import sys; assert sys.version_info >= (3, 10)" *> $null
+    $venvReady = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $previousErrorAction
+    if (-not $venvReady) {
+        $resolvedScripts = (Resolve-Path -LiteralPath $PSScriptRoot).Path
+        $resolvedVenvParent = (Resolve-Path -LiteralPath (Split-Path -Parent $venv)).Path
+        if ($resolvedVenvParent -ne $resolvedScripts -or (Split-Path -Leaf $venv) -ne ".venv") {
+            throw "Refusing to remove an unexpected virtual environment path: $venv"
+        }
+        Write-Host "[BOOTSTRAP] Existing virtual environment is broken or was relocated: $venv"
+        Write-Host "[BOOTSTRAP] Removing it so it can be rebuilt from the local Python runtime ..."
+        Remove-Item -LiteralPath $venv -Recurse -Force
+    }
+}
+
+if (-not $venvReady) {
+    Write-Host "[BOOTSTRAP] Python virtual environment is missing or unusable: $venv"
 
     $bootstrapPython = Find-BootstrapPython
 
