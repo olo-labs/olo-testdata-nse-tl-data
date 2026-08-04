@@ -1,0 +1,26 @@
+{
+  "indicators": [
+    {"type": "EMA", "periods": [5, 9, 20, 36, 100, 200]},
+    {"type": "AMA", "efficiency_period": 10, "fast_period": 2, "slow_period": 30, "price": "OHLC4"},
+    {"type": "SuperTrend", "period": 10, "multiplier": 3}
+  ],
+  "rsi": {"period": 14, "ma_type": "EXPONENTIAL", "scale": "0_TO_100"},
+  "market_symbols": {
+    "nifty_symbol": "NIFTY 50",
+    "sector_symbol_filter": "NIFTY",
+    "default_sector_symbol": "NIFTY BANK"
+  },
+  "anchored_vwap": {"anchors": ["Year", "Quarter", "Month", "Week", "Day"]},
+  "relative_close": {
+    "mode": "PERCENT_FROM_FIRST_VISIBLE",
+    "series": [{"source": "nifty", "label": "N Close %"}, {"source": "sector", "label": "S Close %"}]
+  },
+  "compatibility": {
+    "nautilus_trader": "1.226.0",
+    "ema_price": "CLOSE",
+    "ama_price": "OHLC4",
+    "atr_ma_type": "SIMPLE",
+    "vwap_price": "TYPICAL_HLC3",
+    "higher_timeframe_alignment": "AS_OF_VALUE_ACROSS_PERIOD"
+  }
+}

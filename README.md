@@ -1,26 +1,122 @@
-# Citus trade-log to Parquet exporter
+# NSE India Multi-Timeframe TL Data in Parquet
 
-This project uses DuckDB to discover every equity in a Citus/PostgreSQL table and stream that equity's rows into its own compressed Parquet file. Python never loads the result rows into memory.
+Open, query-ready **NSE India daily OHLCV and multi-timeframe TL dataset** organized as one Parquet file per symbol. Each local file combines daily market candles with Daily, Weekly, Monthly, and Quarterly TL values in both standard and OHLC-derived forms.
 
-The output follows the existing OLO symbol database layout:
+This repository is designed for technical-level research, chart overlays, screening, DuckDB and pandas analysis, backtesting inputs, data engineering, machine learning, and reproducible educational examples.
+
+> [!IMPORTANT]
+> This is an independent community project. It is not affiliated with, endorsed by, or operated by the National Stock Exchange of India. The dataset is provided for research and education, not investment advice. Validate the data, indicator interpretation, and source rights before production use.
+
+## What is included
+
+- One `tl.parquet` file per qualifying symbol.
+- Daily OHLCV columns for charting and validation.
+- Daily, Weekly, Monthly, and Quarterly TL values.
+- Parallel `*_tl_ohlc` values derived from OHLC-oriented inputs upstream.
+- Symbol-partitioned storage for fast single-instrument reads.
+- Incremental and full Citus/PostgreSQL-to-Parquet export tooling.
+- A repository-local **OLO DB Viewer** configured exclusively for this repository's `database/` directory.
+
+Common discovery terms: NSE technical levels dataset, NSE TL data, Indian stock market support resistance data, NSE daily OHLCV Parquet, weekly monthly quarterly technical levels, DuckDB NSE indicators, pandas Indian equities data, and multi-timeframe stock levels.
+
+## Documentation index
+
+| Resource | Purpose |
+| --- | --- |
+| [File structure](docs/FILE_STRUCTURE.md) | Symbol directories, `tl.parquet`, and internal build paths |
+| [Data dictionary](docs/DATA_DICTIONARY.md) | Exact 14-column schema and TL field definitions |
+| [Quick start](docs/QUICKSTART.md) | DuckDB, Python, pandas, and Polars examples |
+| [Data quality](docs/DATA_QUALITY.md) | Validation SQL, assumptions, and limitations |
+| [FAQ](docs/FAQ.md) | Direct answers for developers, search engines, and AI tools |
+| [LLM index](llms.txt) | Compact machine-readable repository map |
+| [Dataset metadata](metadata/dataset.jsonld) | Schema.org JSON-LD dataset description |
+| [Exporter configuration](scripts/config.example.json) | Citus source and local output settings |
+
+## Repository layout
 
 ```text
-database/
-  a/
-    ABC/
-      tl.parquet
-  3/
-    3MINDIA/
-      tl.parquet
+olo-testdata-nse-tl-data/
+├── database/
+│   ├── a/ABB/tl.parquet
+│   ├── r/RELIANCE/tl.parquet
+│   └── _temp/                         # optional DuckDB spill directory
+├── scripts/
+│   ├── export_citus_to_parquet.py     # streaming exporter
+│   ├── config.example.json            # safe configuration template
+│   ├── run.ps1
+│   └── run.bat
+├── olo-db-viewer/                     # repository-local TL database checker
+├── olo-viewer/                        # reserved future viewer location
+├── docs/
+├── create.bat                         # rebuild all local symbol files
+├── incremental.bat                    # append newer source rows
+└── olo-db-viewer.bat                  # launch the local viewer
 ```
 
-## Configure
+## Parquet schema
 
-Copy `scripts/config.example.json` to the ignored `scripts/config.json`, then set the actual schema, table, equity column, selected columns, and optional SQL filter. Column names in `columns` and `order_by` are validated identifiers. `where` is intended for a trusted, repository-owned filter such as `series = 'EQ'`.
+Each `tl.parquet` file contains:
 
-Connection values can be stored directly in the ignored local `scripts/config.json`
-for double-click operation, or supplied through environment variables as shown below
-(use the Citus coordinator as the host):
+```text
+daily_tl, daily_tl_ohlc,
+weekly_tl, weekly_tl_ohlc,
+monthly_tl, monthly_tl_ohlc,
+quarterly_tl, quarterly_tl_ohlc,
+candle_datetime,
+daily_open, daily_high, daily_low, daily_close, daily_volume
+```
+
+The eight TL/OHLC columns and five daily market columns are `DOUBLE`; `candle_datetime` is `TIMESTAMP`. See the [data dictionary](docs/DATA_DICTIONARY.md) for semantics and null handling.
+
+Physical row order is not guaranteed unless an export configuration explicitly sorts it. Consumers should use `ORDER BY candle_datetime`.
+
+## Query one symbol
+
+```sql
+SELECT
+  candle_datetime,
+  daily_open,
+  daily_high,
+  daily_low,
+  daily_close,
+  daily_volume,
+  daily_tl,
+  weekly_tl,
+  monthly_tl,
+  quarterly_tl
+FROM read_parquet('database/r/RELIANCE/tl.parquet')
+ORDER BY candle_datetime;
+```
+
+Python with DuckDB:
+
+```python
+import duckdb
+
+levels = duckdb.sql("""
+    SELECT *
+    FROM read_parquet('database/r/RELIANCE/tl.parquet')
+    ORDER BY candle_datetime
+""").df()
+
+print(levels.tail())
+```
+
+More recipes are available in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+## Open OLO DB Viewer
+
+On Windows, double-click `olo-db-viewer.bat` in the repository root. This copy of OLO DB Viewer reads only `database/*/*/tl.parquet` from this repository and exposes the stored Daily, Weekly, Monthly, and Quarterly TL/TL-OHLC series as chart overlays.
+
+## Configure the exporter
+
+Copy the safe template to the ignored local configuration:
+
+```powershell
+Copy-Item .\scripts\config.example.json .\scripts\config.json
+```
+
+Set the Citus coordinator connection through the environment variables named by the configuration:
 
 ```powershell
 $env:CITUS_HOST = "citus-coordinator.example.com"
@@ -30,72 +126,34 @@ $env:CITUS_USER = "readonly_exporter"
 $env:CITUS_PASSWORD = "..."
 ```
 
-The database user needs only `CONNECT`, `USAGE` on the configured schema, and
-`SELECT` on the source table. The local `scripts/config.json` is excluded from Git,
-and credentials are never printed in console logs.
+Credentials are not printed and `scripts/config.json` is ignored. Use a database role limited to `CONNECT`, schema `USAGE`, and source-table `SELECT`.
 
-## Run
+## Build and update
 
-First test one equity or a small number:
-
-```powershell
-Copy-Item .\scripts\config.example.json .\scripts\config.json
-.\scripts\run.ps1 -Equity RELIANCE
-.\scripts\run.ps1 -LimitEquities 5 -Refresh
-```
-
-Export all equities:
-
-```powershell
-.\scripts\run.ps1
-```
-
-One-click Windows commands:
+Full local recreation:
 
 ```bat
 create.bat
+```
+
+Incremental export using `candle_datetime` as the watermark:
+
+```bat
 incremental.bat
 ```
 
-`create.bat` first deletes the complete configured generated `database` directory,
-then rebuilds every equity file from the source table. This also removes stale
-symbols and abandoned temporary files. `incremental.bat`
-reads the maximum configured `incremental_column` from each existing Parquet,
-adds only newer source rows, and creates files for equities that do not exist
-locally yet. For this dataset the incremental column is `candle_datetime`.
-
-Both commands print detailed live progress to the console: startup settings,
-connection/discovery phases, the current symbol and action, completed and total
-symbols, overall percentage, elapsed time, estimated time remaining, incremental
-watermarks, rows written, output paths, errors, and a final summary. Database
-credentials are never included in these logs.
-
-Symbol names and output directory names are taken from the source table's
-`pk_field` column. The configured symbol universe includes a symbol only when at least one source
-row has `daily_tl > 0`. This eligibility check runs inside Citus before symbol
-names are returned. After a symbol qualifies, all its configured rows are exported,
-including rows where `daily_tl` is zero or null.
-
-No preinstalled Python is required. On the first run, the launcher downloads the
-official signed Python 3.12 installer from `python.org`, verifies its Windows
-Authenticode signature, installs a private runtime under `scripts/.python`, creates
-`scripts/.venv`, and installs DuckDB. Later runs reuse those local components.
-
-Existing files are skipped, so an interrupted run can be restarted. Use `-Refresh` to atomically replace them. A file is first written as `tl.tmp.parquet`, checked for readable metadata, and then renamed to `tl.parquet`.
-
-Validate every completed file without connecting to Citus:
+Offline validation of completed Parquet files:
 
 ```powershell
 .\scripts\run.ps1 -VerifyOnly
 ```
 
-## Large-data behavior
+The exporter processes one equity at a time, streams through DuckDB's PostgreSQL extension, writes a temporary Parquet, verifies it, and atomically replaces `tl.parquet`. Existing completed symbols can be skipped or incrementally extended.
 
-- DuckDB's PostgreSQL extension reads from the Citus coordinator and pushes the equality filter for each equity into PostgreSQL.
-- Only one equity is exported at a time, bounding local memory and database concurrency.
-- DuckDB spills to `database/_temp` after reaching `duckdb.memory_limit`.
-- Zstandard compression and 122,880-row row groups are the defaults; both are configurable.
-- Add the table's Citus distribution/partition key to `equity_column` when possible. An index on that column also helps the distinct-equity discovery query.
-- Leave `order_by` empty for maximum throughput. Add a timestamp column only if consumers require physical chronological order; sorting very large equities requires additional temporary disk.
+## Contributing
 
-DuckDB installs its `postgres` extension on the first connected run, so that run requires internet access. Later runs use the cached extension.
+Helpful contributions include reproducible validation reports, query recipes, documentation corrections, exporter tests, cross-platform launchers, and improvements to the local TL viewer. Do not commit credentials or private database configuration.
+
+## License and attribution
+
+Repository code is covered by [LICENSE](LICENSE). Dataset/source rights may be separate; verify them before redistribution. Cite the repository URL and record the Git commit or release used for reproducibility.

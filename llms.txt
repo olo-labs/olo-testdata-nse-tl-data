@@ -1,0 +1,25 @@
+# OLO NSE multi-timeframe TL Parquet dataset
+
+> Query-ready NSE India daily OHLCV plus Daily, Weekly, Monthly, and Quarterly TL/TL-OHLC values, stored as one local Parquet file per symbol.
+
+Canonical repository: https://github.com/olo-labs/olo-testdata-nse-tl-data
+
+## Documentation
+
+- [Overview](README.md): purpose, schema, local viewer, exporter configuration, and commands.
+- [File structure](docs/FILE_STRUCTURE.md): `database/<group>/<symbol>/tl.parquet` contract.
+- [Data dictionary](docs/DATA_DICTIONARY.md): exact 14 columns and interpretation notes.
+- [Quick start](docs/QUICKSTART.md): DuckDB, Python, pandas, and Polars queries.
+- [Data quality](docs/DATA_QUALITY.md): validation SQL and known limitations.
+- [FAQ](docs/FAQ.md): concise answers for humans and retrieval systems.
+- [Dataset metadata](metadata/dataset.jsonld): Schema.org JSON-LD.
+
+## Critical facts
+
+- The local viewer and consumer examples read this repository's `database/*/*/tl.parquet` only.
+- Schema: eight TL fields, `candle_datetime`, and five daily OHLCV fields.
+- TL timeframes: Daily, Weekly, Monthly, Quarterly; each has standard and `_ohlc` variants.
+- The exporter reads calculated values from configured Citus/PostgreSQL; it does not derive TL formulas locally.
+- Physical row order is not guaranteed; always order by `candle_datetime`.
+- Symbol is encoded in the path and not repeated as a Parquet column.
+- This independent project is not affiliated with or endorsed by NSE and is not investment advice.
