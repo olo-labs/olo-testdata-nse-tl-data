@@ -1299,15 +1299,13 @@ class OloDbViewer(tk.Tk):
             return
         if index == self.tooltip_index and self.tooltip.get_visible():
             return
-        stamp, open_, high, low, close, volume, delivery, del_percent = self.visible_rows[index]
-        delivery_text = "—" if delivery is None else f"{delivery:,.0f}"
-        percent_text = "—" if del_percent is None else f"{del_percent:.2f}%"
+        stamp, open_, high, low, close, volume = self.visible_rows[index][:6]
         self.tooltip.xy = (index, high)
         self.tooltip.set_text(
             f"{stamp:%d %b %Y  %H:%M}\n"
             f"Open     {open_:,.2f}\nHigh      {high:,.2f}\n"
             f"Low       {low:,.2f}\nClose     {close:,.2f}\n"
-            f"Volume    {volume:,.0f}\nDelivery  {delivery_text}\nDelivery %  {percent_text}"
+            f"Volume    {volume:,.0f}"
             + self._indicator_tooltip_text(index)
         )
         self._position_tooltip(self.tooltip, self.price_axis, index, high)
@@ -1327,10 +1325,8 @@ class OloDbViewer(tk.Tk):
             return
         if index == self.bottom_tooltip_index and self.bottom_tooltip.get_visible():
             return
-        stamp, _, _, _, _, volume, delivery, del_percent = self.visible_rows[index]
+        stamp, _, _, _, _, volume = self.visible_rows[index][:6]
         lines = [f"{stamp:%d %b %Y  %H:%M}", f"Volume       {volume:,.0f}"]
-        lines.append(f"Delivery     {'—' if delivery is None else f'{delivery:,.0f}'}")
-        lines.append(f"Delivery %   {'—' if del_percent is None else f'{del_percent:.2f}%'}")
         indicator_text = self._indicator_tooltip_text(index)
         if indicator_text:
             lines.extend(indicator_text.lstrip("\n").splitlines())
@@ -1376,7 +1372,7 @@ class OloDbViewer(tk.Tk):
 
     def _select_candle_cutoff(self, event) -> None:
         """Use a clicked price candle as the point-in-time chart cutoff."""
-        if event.inaxes is not self.price_axis or event.xdata is None or not self.current_chart:
+        if event.inaxes not in self.price_axes or event.xdata is None or not self.current_chart:
             return
         index = int(round(event.xdata))
         if index < 0 or index >= len(self.visible_rows) or abs(event.xdata - index) > .7:
@@ -1385,14 +1381,14 @@ class OloDbViewer(tk.Tk):
         global_index = self.visible_start + index
         all_rows = self.current_chart[2]
         if interval in {"Day", "Week", "Month", "Quarter", "Year"}:
-            if global_index == len(all_rows) - 1 and self.loaded_as_of is not None:
-                cutoff = self.loaded_as_of
+            if global_index + 1 < len(all_rows):
+                period_end = all_rows[global_index + 1][0]
             else:
-                next_stamp = all_rows[global_index + 1][0]
-                if isinstance(next_stamp, datetime):
-                    cutoff = next_stamp - timedelta(minutes=1)
-                else:
-                    cutoff = datetime.combine(next_stamp, datetime.min.time()) - timedelta(minutes=1)
+                period_start = _bucket_start(all_rows[global_index][0], interval)
+                period_end = _next_bucket_start(period_start, interval)
+            if not isinstance(period_end, datetime):
+                period_end = datetime.combine(period_end, datetime.min.time())
+            cutoff = period_end - timedelta(minutes=1)
         else:
             stamp = self.visible_rows[index][0]
             cutoff = stamp if isinstance(stamp, datetime) else datetime.combine(stamp, datetime.min.time())
