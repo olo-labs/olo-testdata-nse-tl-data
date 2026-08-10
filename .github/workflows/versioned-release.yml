@@ -1,0 +1,60 @@
+name: Manual versioned NSE TL-data release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example v1.0.0"
+        required: true
+        type: string
+      release_title:
+        description: "Optional release title"
+        required: false
+        default: ""
+        type: string
+      prerelease:
+        description: "Mark as a pre-release"
+        required: true
+        default: false
+        type: boolean
+      make_latest:
+        description: "Mark as the latest release"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      title: ${{ steps.release.outputs.title }}
+    steps:
+      - id: release
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          REQUESTED_TITLE: ${{ inputs.release_title }}
+        run: |
+          if ($env:VERSION -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Version must look like v1.0.0 or v1.0.0-rc.1."
+          }
+          $title = $env:REQUESTED_TITLE.Trim()
+          if (-not $title) { $title = "NSE TL Parquet Data $env:VERSION" }
+          "title=$title" >> $env:GITHUB_OUTPUT
+
+  release:
+    needs: validate
+    uses: ./.github/workflows/package-release.yml
+    with:
+      tag: ${{ inputs.version }}
+      title: ${{ needs.validate.outputs.title }}
+      version: ${{ inputs.version }}
+      rolling: false
+      prerelease: ${{ inputs.prerelease }}
+      make_latest: ${{ inputs.make_latest }}
+      trigger_message: Manual versioned release
+    permissions:
+      contents: write

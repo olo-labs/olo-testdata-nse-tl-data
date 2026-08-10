@@ -1,0 +1,31 @@
+name: Rolling NSE TL-data release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: "Create the rolling release manually"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'RC:')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.force_release)
+    uses: ./.github/workflows/package-release.yml
+    with:
+      tag: nse-tl-latest
+      title: Latest NSE TL Parquet Data
+      rolling: true
+      prerelease: true
+      make_latest: false
+      trigger_message: ${{ github.event_name == 'push' && github.event.head_commit.message || 'Manual rolling release' }}
+    permissions:
+      contents: write

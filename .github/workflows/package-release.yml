@@ -1,0 +1,182 @@
+name: Package and publish NSE TL data
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      title:
+        required: true
+        type: string
+      version:
+        required: false
+        default: ""
+        type: string
+      rolling:
+        required: true
+        type: boolean
+      prerelease:
+        required: false
+        default: false
+        type: boolean
+      make_latest:
+        required: false
+        default: false
+        type: boolean
+      trigger_message:
+        required: false
+        default: "Manual release"
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  MAXIMUM_ARCHIVE_BYTES: "2040109465"
+  TARGET_SOURCE_BYTES: "1800000000"
+  MAXIMUM_DATA_ARCHIVE_COUNT: "30"
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    concurrency:
+      group: nse-tl-release-${{ inputs.tag }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out repository and LFS data
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Download Git LFS objects
+        shell: pwsh
+        run: |
+          git lfs pull
+          if ($LASTEXITCODE -ne 0) { throw "Downloading Git LFS objects failed." }
+
+      - name: Build bounded release archives
+        shell: pwsh
+        run: |
+          & ./scripts/Build-ReleaseArchives.ps1 `
+            -MaximumArchiveBytes ([long]$env:MAXIMUM_ARCHIVE_BYTES) `
+            -TargetSourceBytes ([long]$env:TARGET_SOURCE_BYTES)
+          if ($LASTEXITCODE -ne 0) { throw "Archive builder failed." }
+
+      - name: Validate and prepare release assets
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          IS_ROLLING: ${{ inputs.rolling }}
+          TRIGGER_MESSAGE: ${{ inputs.trigger_message }}
+        run: |
+          $manifest = Get-Content -LiteralPath $env:RELEASE_MANIFEST -Raw | ConvertFrom-Json
+          $assets = @($manifest.assets)
+          if ($assets.Count -eq 0) { throw "The manifest contains no archives." }
+          if ($assets.Count -gt [int]$env:MAXIMUM_DATA_ARCHIVE_COUNT) {
+            throw "Generated $($assets.Count) parts; maximum is $env:MAXIMUM_DATA_ARCHIVE_COUNT."
+          }
+          foreach ($asset in $assets) {
+            $path = Join-Path $env:RELEASE_ASSET_DIRECTORY $asset.file
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing asset: $path" }
+            if ((Get-Item -LiteralPath $path).Length -ge [long]$env:MAXIMUM_ARCHIVE_BYTES) {
+              throw "Release archive exceeds the configured limit: $($asset.file)"
+            }
+          }
+
+          Copy-Item -LiteralPath ./LICENSE -Destination (Join-Path $env:RELEASE_ASSET_DIRECTORY "LICENSE") -Force
+          $template = if ($env:IS_ROLLING -eq "true") {
+            ".github/release-notes/latest.md"
+          } else {
+            ".github/release-notes/version.md"
+          }
+          $notesName = if ($env:IS_ROLLING -eq "true") {
+            "RELEASE_NOTES.md"
+          } else {
+            "RELEASE_NOTES-$env:RELEASE_VERSION.md"
+          }
+          $rows = @($assets | ForEach-Object {
+            $sourceMiB = [Math]::Round([double]$_.sourceBytes / 1MB, 2)
+            $archiveMiB = [Math]::Round([double]$_.bytes / 1MB, 2)
+            "| ``$($_.file)`` | $($_.sourceFileCount) | $sourceMiB MiB | $archiveMiB MiB |"
+          }) -join [Environment]::NewLine
+          $commit = "${{ github.sha }}"
+          $content = Get-Content -LiteralPath $template -Raw
+          $replacements = @{
+            "{{VERSION}}" = $env:RELEASE_VERSION
+            "{{DATE}}" = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
+            "{{TIME}}" = (Get-Date).ToUniversalTime().ToString("HH:mm:ss")
+            "{{COMMIT}}" = $commit
+            "{{SHORT_COMMIT}}" = $commit.Substring(0, 7)
+            "{{COMMIT_MESSAGE}}" = $env:TRIGGER_MESSAGE
+            "{{SOURCE_FILES}}" = [string]$manifest.sourceFileCount
+            "{{ASSET_COUNT}}" = [string]$assets.Count
+            "{{ASSET_TABLE}}" = $rows
+          }
+          foreach ($key in $replacements.Keys) { $content = $content.Replace($key, $replacements[$key]) }
+          $notesPath = Join-Path $env:RELEASE_ASSET_DIRECTORY $notesName
+          Set-Content -LiteralPath $notesPath -Value $content -Encoding utf8
+          if (Select-String -LiteralPath $notesPath -Pattern '\{\{[A-Z0-9_]+\}\}') {
+            throw "Release notes contain unresolved placeholders."
+          }
+          "RELEASE_NOTES=$notesPath" >> $env:GITHUB_ENV
+          "RELEASE_NOTES_NAME=$notesName" >> $env:GITHUB_ENV
+          "RELEASE_PART_COUNT=$($assets.Count)" >> $env:GITHUB_ENV
+          "RELEASE_SOURCE_FILE_COUNT=$($manifest.sourceFileCount)" >> $env:GITHUB_ENV
+
+      - name: Create or update tag and release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TITLE: ${{ inputs.title }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
+          MAKE_LATEST: ${{ inputs.make_latest }}
+        run: |
+          git tag --force $env:RELEASE_TAG "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) { throw "Creating release tag failed." }
+          git push origin "refs/tags/$env:RELEASE_TAG" --force
+          if ($LASTEXITCODE -ne 0) { throw "Pushing release tag failed." }
+
+          gh release view $env:RELEASE_TAG *> $null
+          $exists = $LASTEXITCODE -eq 0
+          $latest = if ($env:MAKE_LATEST -eq "true") { "true" } else { "false" }
+          if ($exists) {
+            gh release edit $env:RELEASE_TAG --title $env:RELEASE_TITLE --notes-file $env:RELEASE_NOTES --latest=$latest --prerelease=$env:IS_PRERELEASE
+            if ($LASTEXITCODE -ne 0) { throw "Updating release metadata failed." }
+            $release = gh release view $env:RELEASE_TAG --json assets | ConvertFrom-Json
+            foreach ($asset in @($release.assets)) {
+              gh release delete-asset $env:RELEASE_TAG $asset.name --yes
+              if ($LASTEXITCODE -ne 0) { throw "Deleting old asset failed: $($asset.name)" }
+            }
+          } else {
+            $arguments = @("release", "create", $env:RELEASE_TAG, "--title", $env:RELEASE_TITLE, "--notes-file", $env:RELEASE_NOTES, "--latest=$latest")
+            if ($env:IS_PRERELEASE -eq "true") { $arguments += "--prerelease" }
+            & gh @arguments
+            if ($LASTEXITCODE -ne 0) { throw "Creating release failed." }
+          }
+
+          $assets = @(Get-ChildItem -LiteralPath $env:RELEASE_ASSET_DIRECTORY -File | Where-Object {
+            $_.Extension -eq ".zip" -or $_.Name -in @("RELEASE_MANIFEST.json", "SHA256SUMS.txt", "LICENSE", $env:RELEASE_NOTES_NAME)
+          } | Sort-Object Name)
+          if ($assets.Count -lt 5) { throw "The complete release asset set was not found." }
+          gh release upload $env:RELEASE_TAG @($assets.FullName) --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Uploading release assets failed." }
+
+          $published = gh release view $env:RELEASE_TAG --json assets,url | ConvertFrom-Json
+          if (@($published.assets).Count -ne $assets.Count) { throw "Published asset count does not match." }
+          "RELEASE_URL=$($published.url)" >> $env:GITHUB_ENV
+
+      - name: Release summary
+        shell: pwsh
+        run: |
+          @"
+          ## NSE TL Parquet release
+
+          - **Tag:** ``${{ inputs.tag }}``
+          - **Parquet files:** $env:RELEASE_SOURCE_FILE_COUNT
+          - **Archive parts:** $env:RELEASE_PART_COUNT
+          - **Release:** $env:RELEASE_URL
+          "@ >> $env:GITHUB_STEP_SUMMARY

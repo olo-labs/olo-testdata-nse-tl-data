@@ -100,6 +100,17 @@ FROM read_parquet('database/r/RELIANCE/tl.parquet')
 ORDER BY candle_datetime;
 ```
 
+## Download a packaged release
+
+GitHub releases publish the complete `database/` tree as bounded ZIP parts.
+Extract every `NSE-TL-Parquet-part-*.zip` into the same destination; each part
+retains paths such as `database/r/RELIANCE/tl.parquet`.
+
+Each release also provides `RELEASE_MANIFEST.json` and `SHA256SUMS.txt` for
+file counts, part metadata, and integrity verification. Versioned releases are
+created manually. The `nse-tl-latest` rolling pre-release is refreshed by a
+commit whose message starts with `RC:`.
+
 Python with DuckDB:
 
 ```python
