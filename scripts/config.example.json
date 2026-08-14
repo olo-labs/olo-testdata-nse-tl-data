@@ -5,7 +5,8 @@
     "name_env": "CITUS_DATABASE",
     "user_env": "CITUS_USER",
     "password_env": "CITUS_PASSWORD",
-    "sslmode": "require"
+    "sslmode": "require",
+    "sslmode_env": "CITUS_SSLMODE"
   },
   "source": {
     "schema": "public",

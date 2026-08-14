@@ -131,7 +131,8 @@ def load_configuration(path: Path) -> dict:
 
 def env_value(database: dict, key: str, default: str | None = None) -> str:
     env_name = database.get(f"{key}_env")
-    value = os.environ.get(env_name, "") if env_name else str(database.get(key, ""))
+    configured = str(database.get(key, ""))
+    value = os.environ.get(env_name, configured) if env_name else configured
     value = value or (default or "")
     if not value:
         raise ValueError(f"Database setting {key!r} is missing (expected environment variable {env_name!r})")
@@ -145,7 +146,7 @@ def pg_connection_string(database: dict) -> str:
         "dbname": env_value(database, "name"),
         "user": env_value(database, "user"),
         "password": env_value(database, "password"),
-        "sslmode": str(database.get("sslmode", "require")),
+        "sslmode": env_value(database, "sslmode", "require"),
     }
 
     def escape(value: str) -> str:
