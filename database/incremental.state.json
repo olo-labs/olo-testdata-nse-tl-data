@@ -1,0 +1,7 @@
+{
+  "state": "IDLE",
+  "message": "No incremental build has run",
+  "started_at": null,
+  "finished_at": null,
+  "last_successful_build_at": null
+}
