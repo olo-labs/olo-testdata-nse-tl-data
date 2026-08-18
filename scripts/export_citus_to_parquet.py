@@ -345,6 +345,19 @@ def latest_incremental_value(connection, config: dict, destination: Path):
     ).fetchone()[0]
 
 
+def parquet_columns(connection, path: Path) -> list[str]:
+    return [row[0] for row in connection.execute(
+        "DESCRIBE SELECT * FROM read_parquet(?)", [str(path)]
+    ).fetchall()]
+
+
+def source_columns(connection, config: dict) -> list[str]:
+    table, _equity, columns = source_sql(config)
+    return [row[0] for row in connection.execute(
+        f"DESCRIBE SELECT {columns} FROM {table} LIMIT 0"
+    ).fetchall()]
+
+
 def verify(config: dict) -> tuple[int, int]:
     root = config["output"]["directory"]
     filename = config["output"]["filename"]
@@ -399,6 +412,7 @@ def main() -> int:
         if not equities:
             raise RuntimeError("The equity query returned no values")
         log(f"Equity discovery complete: found {len(equities):,} equities", "SUCCESS")
+        expected_columns = source_columns(connection, config)
         exported = skipped = total_rows = 0
         for index, symbol in enumerate(equities, 1):
             destination = output_path(config, symbol)
@@ -408,10 +422,20 @@ def main() -> int:
                 log(f"SKIP symbol={symbol!r}; completed file already exists: {destination}")
                 continue
             if destination.exists() and args.incremental:
-                progress_line(index, len(equities), started, symbol, "reading incremental watermark")
-                start_after = latest_incremental_value(connection, config, destination)
-                log(f"Incremental watermark for symbol={symbol!r}: {start_after}")
-                log(f"Querying source rows newer than {start_after} for symbol={symbol!r}")
+                existing_columns = parquet_columns(connection, destination)
+                if existing_columns != expected_columns:
+                    progress_line(index, len(equities), started, symbol, "rebuilding for source schema change")
+                    start_after = None
+                    log(
+                        f"Schema changed for symbol={symbol!r}: existing={len(existing_columns)} "
+                        f"columns, source={len(expected_columns)} columns; rebuilding complete file"
+                    )
+                    log(f"Querying all configured source columns for symbol={symbol!r}")
+                else:
+                    progress_line(index, len(equities), started, symbol, "reading incremental watermark")
+                    start_after = latest_incremental_value(connection, config, destination)
+                    log(f"Incremental watermark for symbol={symbol!r}: {start_after}")
+                    log(f"Querying source rows newer than {start_after} for symbol={symbol!r}")
             else:
                 start_after = None
                 action = "refreshing complete file" if args.refresh else "creating missing file"

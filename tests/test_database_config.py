@@ -2,16 +2,35 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import duckdb
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from export_citus_to_parquet import env_value, pg_connection_string, source_sql
+from export_citus_to_parquet import env_value, parquet_columns, pg_connection_string, source_sql
 
 
 class DatabaseEnvironmentTests(unittest.TestCase):
+    def test_parquet_columns_reports_exact_file_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "schema.parquet"
+            connection = duckdb.connect()
+            try:
+                connection.execute(
+                    "COPY (SELECT 1 AS first_column, 'x' AS second_column) "
+                    "TO ? (FORMAT PARQUET)", [str(path)]
+                )
+                self.assertEqual(
+                    parquet_columns(connection, path),
+                    ["first_column", "second_column"],
+                )
+            finally:
+                connection.close()
+
     def test_wildcard_source_preserves_database_column_names(self) -> None:
         config = {
             "source": {
