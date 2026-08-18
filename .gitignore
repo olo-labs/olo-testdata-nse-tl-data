@@ -3,6 +3,5 @@
 _bootstrap/
 __pycache__/
 *.pyc
-/scripts/config.json
 /release-assets/
 
