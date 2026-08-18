@@ -8,10 +8,30 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from export_citus_to_parquet import env_value, pg_connection_string
+from export_citus_to_parquet import env_value, pg_connection_string, source_sql
 
 
 class DatabaseEnvironmentTests(unittest.TestCase):
+    def test_wildcard_source_preserves_database_column_names(self) -> None:
+        config = {
+            "source": {
+                "schema": "public", "table": "ag_day_200d", "equity_column": "pk_field",
+                "columns": ["*"], "normalize_to_date": [],
+            }
+        }
+        _table, _equity, columns = source_sql(config)
+        self.assertEqual(columns, "*")
+
+    def test_wildcard_normalization_preserves_column_position(self) -> None:
+        config = {
+            "source": {
+                "schema": "public", "table": "ag_day_200d", "equity_column": "pk_field",
+                "columns": ["*"], "normalize_to_date": ["candle_datetime"],
+            }
+        }
+        _table, _equity, columns = source_sql(config)
+        self.assertEqual(columns, '* REPLACE (CAST(CAST("candle_datetime" AS DATE) AS TIMESTAMP) AS "candle_datetime")')
+
     def test_configured_host_is_the_fallback_when_override_is_absent(self) -> None:
         database = {"host": "127.0.0.1", "host_env": "OLO_CITUS_HOST"}
         with patch.dict(os.environ, {}, clear=True):

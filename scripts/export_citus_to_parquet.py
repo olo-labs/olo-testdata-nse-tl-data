@@ -85,10 +85,7 @@ def load_configuration(path: Path) -> dict:
         identifier(source[key])
     columns = source.get("columns", ["*"])
     if columns != ["*"]:
-        if not columns or not all(isinstance(column, str) for column in columns):
-            raise ValueError("source.columns must be [\"*\"] or a non-empty identifier list")
-        for column in columns:
-            identifier(column)
+        raise ValueError('source.columns must be ["*"]; TL exports mirror every database column')
     for column in source.get("order_by", []):
         identifier(column)
     if source.get("incremental_column"):
@@ -177,11 +174,10 @@ def source_sql(config: dict) -> tuple[str, str, str]:
     normalized = set(normalized_columns)
     if selected == ["*"]:
         columns = "*" if not normalized else (
-            f"* EXCLUDE ({', '.join(identifier(column) for column in normalized_columns)}), "
-            + ", ".join(
+            "* REPLACE (" + ", ".join(
                 f"CAST(CAST({identifier(column)} AS DATE) AS TIMESTAMP) AS {identifier(column)}"
                 for column in normalized_columns
-            )
+            ) + ")"
         )
     else:
         columns = ", ".join(
@@ -311,6 +307,16 @@ def export_equity(connection, config: dict, symbol: str, destination: Path,
         rows = connection.execute(
             "SELECT coalesce(sum(num_rows), 0) FROM parquet_file_metadata(?)", [str(delta)]
         ).fetchone()[0]
+        expected_columns = [row[0] for row in connection.execute(
+            f"DESCRIBE SELECT {columns} FROM {table} LIMIT 0"
+        ).fetchall()]
+        actual_columns = [row[0] for row in connection.execute(
+            "DESCRIBE SELECT * FROM read_parquet(?)", [str(delta)]
+        ).fetchall()]
+        if actual_columns != expected_columns:
+            raise RuntimeError(
+                f"Parquet schema mismatch for {symbol}: expected {expected_columns}, got {actual_columns}"
+            )
         if start_after is not None:
             if rows == 0:
                 return 0
@@ -323,6 +329,7 @@ def export_equity(connection, config: dict, symbol: str, destination: Path,
                 f"ROW_GROUP_SIZE {row_group})"
             )
         os.replace(temporary, destination)
+        log(f"Schema verified for symbol={symbol!r}: {len(actual_columns)} exact source columns")
         return int(rows)
     finally:
         temporary.unlink(missing_ok=True)
@@ -370,7 +377,8 @@ def main() -> int:
             f"Symbol eligibility: at least one row with "
             f"{source['eligibility_column']} > {source.get('eligibility_min_exclusive', 0)}"
         )
-    log(f"Selected columns: {len(source.get('columns', ['*']))}")
+    configured_columns = source.get("columns", ["*"])
+    log("Selected columns: all source columns" if configured_columns == ["*"] else f"Selected columns: {len(configured_columns)}")
     log(f"Output directory: {config['output']['directory']}")
     log(f"Output filename: {config['output']['filename']}")
     log(f"Compression: {config['output']['compression']}")

@@ -1,6 +1,9 @@
 # NSE TL Parquet Data Dictionary
 
-The current generated `tl.parquet` contract has 14 ordered columns.
+The generated `tl.parquet` schema mirrors the configured database projection,
+normally `SELECT *`. The exporter verifies exact column names and order for
+every symbol. The fields below are common known columns, not a closed list;
+new database columns appear automatically.
 
 | Column | Type | Meaning |
 | --- | --- | --- |

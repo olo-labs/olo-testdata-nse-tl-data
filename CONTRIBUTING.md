@@ -14,7 +14,7 @@ Contributions that improve reproducibility, correctness, portability, or documen
 ## Before submitting
 
 1. Never commit `scripts/config.json`, passwords, connection strings, or private infrastructure details.
-2. Keep the symbol paths and 14-column schema backward compatible unless proposing a documented version change.
+2. Keep symbol paths stable and preserve source database column names exactly.
 3. Run `.\scripts\run.ps1 -VerifyOnly` when local files are available.
 4. Compile Python changes and test a small symbol set before a complete export.
 5. Update the README, data dictionary, schema JSON, FAQ, and `llms.txt` together when the contract changes.

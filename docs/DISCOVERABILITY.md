@@ -45,9 +45,9 @@ Use phrases naturally. Repetition without useful information harms readability a
 
 - Consumer path: `database/<group>/<symbol>/tl.parquet`.
 - One file represents one symbol.
-- The schema contains 14 ordered columns.
-- Eight columns contain Daily/Weekly/Monthly/Quarterly TL and TL-OHLC values.
-- Five columns contain daily OHLCV; `candle_datetime` is the timestamp.
+- The schema mirrors all configured source-database columns by exact name and order.
+- Daily/Weekly/Monthly/Quarterly TL, OHLC, and newly added source fields can coexist.
+- `candle_datetime` is the standard timestamp and incremental watermark.
 - Consumers must order rows by `candle_datetime`.
 - The exporter reads upstream calculated TL values and does not define their formula.
 - This repository does not contain delivery quantity or delivery percentage.

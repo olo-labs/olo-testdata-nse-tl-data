@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/olo-labs/olo-testdata-nse-tl-data/blob/main/metadata/parquet-schema.json",
   "title": "NSE multi-timeframe TL Parquet row",
-  "description": "Logical row schema for database/<group>/<symbol>/tl.parquet.",
+  "description": "Logical row schema for database/<group>/<symbol>/tl.parquet. The exporter mirrors all configured source columns; listed properties are common fields, not a closed list.",
   "type": "object",
-  "additionalProperties": false,
+  "additionalProperties": true,
   "properties": {
     "daily_tl": {"type": ["number", "null"], "parquetType": "DOUBLE"},
     "daily_tl_ohlc": {"type": ["number", "null"], "parquetType": "DOUBLE"},
@@ -20,15 +20,5 @@
     "daily_low": {"type": ["number", "null"], "parquetType": "DOUBLE"},
     "daily_close": {"type": ["number", "null"], "parquetType": "DOUBLE"},
     "daily_volume": {"type": ["number", "null"], "parquetType": "DOUBLE"}
-  },
-  "required": [
-    "daily_tl", "daily_tl_ohlc", "weekly_tl", "weekly_tl_ohlc",
-    "monthly_tl", "monthly_tl_ohlc", "quarterly_tl", "quarterly_tl_ohlc",
-    "candle_datetime", "daily_open", "daily_high", "daily_low", "daily_close", "daily_volume"
-  ],
-  "x-column-order": [
-    "daily_tl", "daily_tl_ohlc", "weekly_tl", "weekly_tl_ohlc",
-    "monthly_tl", "monthly_tl_ohlc", "quarterly_tl", "quarterly_tl_ohlc",
-    "candle_datetime", "daily_open", "daily_high", "daily_low", "daily_close", "daily_volume"
-  ]
+  }
 }

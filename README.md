@@ -29,7 +29,7 @@ Common discovery terms: NSE technical levels dataset, NSE TL data, Indian stock 
 | Resource | Purpose |
 | --- | --- |
 | [File structure](docs/FILE_STRUCTURE.md) | Symbol directories, `tl.parquet`, and internal build paths |
-| [Data dictionary](docs/DATA_DICTIONARY.md) | Exact 14-column schema and TL field definitions |
+| [Data dictionary](docs/DATA_DICTIONARY.md) | Source-mirrored schema and common TL field definitions |
 | [Quick start](docs/QUICKSTART.md) | DuckDB, Python, pandas, and Polars examples |
 | [Data quality](docs/DATA_QUALITY.md) | Validation SQL, assumptions, and limitations |
 | [FAQ](docs/FAQ.md) | Direct answers for developers, search engines, and AI tools |
@@ -64,7 +64,10 @@ olo-testdata-nse-tl-data/
 
 ## Parquet schema
 
-Each `tl.parquet` file contains:
+Each `tl.parquet` mirrors every column returned by the configured source table
+for that equity. Column names and order are verified against the database
+projection before the file is installed. The standard source currently
+includes fields such as:
 
 ```text
 daily_tl, daily_tl_ohlc,
@@ -75,7 +78,9 @@ candle_datetime,
 daily_open, daily_high, daily_low, daily_close, daily_volume
 ```
 
-The eight TL/OHLC columns and five daily market columns are `DOUBLE`; `candle_datetime` is `TIMESTAMP`. See the [data dictionary](docs/DATA_DICTIONARY.md) for semantics and null handling.
+Additional source columns are exported automatically without an exporter code
+change. `candle_datetime` is normalized to `TIMESTAMP` while retaining its
+exact name and source position. See the [data dictionary](docs/DATA_DICTIONARY.md).
 
 > [!NOTE]
 > This repository does **not** contain deliverable quantity or delivery-percentage columns. Do not infer delivery statistics from `daily_volume`; delivery data belongs to a separate dataset.
